@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+web/dist/
+dist-electron/
+
+# Environment
+.env
+.env.local
+**/.env
+**/.env.local
+
+# SQLite (legacy desktop data)
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+
+# OS / editor
+.DS_Store
+**/.DS_Store
+*.log
+npm-debug.log*
+.vscode/
+.idea/

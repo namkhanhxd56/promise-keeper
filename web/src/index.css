@@ -1,0 +1,100 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #FAF9F6;
+  --bg2: #F3F1EC;
+  --bg3: #ECEAE3;
+  --surface: #FFFFFF;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --text: #1A1916;
+  --text2: #6B6860;
+  --text3: #A09D96;
+  --accent: #2D6A4F;
+  --accent-light: #D8EFE5;
+  --amber: #B45309;
+  --amber-light: #FEF3C7;
+  --red: #9B1C1C;
+  --red-light: #FEE2E2;
+  --purple: #4C1D95;
+  --purple-light: #EDE9FE;
+  --blue: #1E40AF;
+  --blue-light: #DBEAFE;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --font: 'Be Vietnam Pro', sans-serif;
+  --font-display: 'Playfair Display', serif;
+  -webkit-app-region: no-drag;
+}
+
+html, body, #root { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+
+/* Buttons */
+button { font-family: var(--font); cursor: pointer; border: none; background: none; font-size: 13px; }
+button:active { opacity: 0.8; }
+
+/* Inputs */
+input, textarea, select {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--accent); background: var(--surface); }
+input::placeholder, textarea::placeholder { color: var(--text3); }
+
+/* Transitions */
+.fade-in { animation: fadeIn 0.18s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Titlebar drag area */
+.titlebar { -webkit-app-region: drag; height: 28px; }
+
+/* Ngày Chiến Thắng — victory tag */
+.victory-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; letter-spacing: .2px;
+  color: #7C2D12;
+  background: linear-gradient(135deg, #FDE68A 0%, #FBBF24 45%, #F59E0B 100%);
+  box-shadow: 0 0 0 1px rgba(245,158,11,0.35), 0 2px 10px rgba(245,158,11,0.45);
+  animation: victoryGlow 1.8s ease-in-out infinite;
+  white-space: nowrap;
+}
+.victory-tag.sm { font-size: 11px; padding: 2px 9px; }
+@keyframes victoryGlow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(245,158,11,0.35), 0 2px 10px rgba(245,158,11,0.45); filter: brightness(1); }
+  50% { box-shadow: 0 0 0 1px rgba(245,158,11,0.55), 0 3px 18px rgba(245,158,11,0.8); filter: brightness(1.08); }
+}
+.victory-tag .vt-star { display: inline-block; animation: vtSpin 2.6s linear infinite; }
+@keyframes vtSpin { to { transform: rotate(360deg); } }
+
+/* Firework burst when victory is reached */
+.fw-wrap { position: absolute; left: 50%; bottom: 100%; width: 0; height: 0; pointer-events: none; z-index: 50; }
+.fw-rocket { position: absolute; left: -11px; bottom: -6px; font-size: 22px; animation: fwRise 0.7s ease-out forwards; }
+@keyframes fwRise {
+  0% { transform: translateY(38px) scale(0.5); opacity: 0; }
+  55% { opacity: 1; }
+  100% { transform: translateY(-44px) scale(1); opacity: 0; }
+}
+.fw-particle {
+  position: absolute; left: 0; top: -44px; width: 7px; height: 7px; border-radius: 50%;
+  opacity: 0; animation: fwBurst 0.9s ease-out 0.55s forwards;
+}
+@keyframes fwBurst {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+}

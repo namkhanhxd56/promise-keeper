@@ -1,0 +1,20 @@
+{
+  "name": "Promise Keeper",
+  "short_name": "Promise",
+  "description": "Quản lý lời hứa & công việc hằng ngày",
+  "lang": "vi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF9F6",
+  "theme_color": "#2D6A4F",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

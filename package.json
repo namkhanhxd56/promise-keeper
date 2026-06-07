@@ -1,0 +1,50 @@
+{
+  "name": "promise-keeper",
+  "version": "1.0.0",
+  "description": "Ứng dụng quản lý lời hứa (desktop Electron — bản web nằm trong web/ + server/)",
+  "main": "electron.js",
+  "scripts": {
+    "start": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build && electron-builder",
+    "preview": "npm --prefix web run preview"
+  },
+  "build": {
+    "appId": "com.promisekeeper.app",
+    "productName": "Promise Keeper",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns"
+    },
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "web/dist/**/*",
+      "electron.js",
+      "preload.js",
+      "backend/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      }
+    ]
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "date-fns": "^3.6.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^8.2.2",
+    "electron": "^29.1.4",
+    "electron-builder": "^24.13.3",
+    "vite": "^5.2.0",
+    "wait-on": "^7.2.0"
+  }
+}
