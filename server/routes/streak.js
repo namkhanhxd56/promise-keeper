@@ -2,7 +2,7 @@ const express = require('express')
 const { q, q1 } = require('../db')
 const { wrap } = require('../lib/http')
 const { localDateStr, today } = require('../lib/dates')
-const { getTodosForDate, completedDateSet } = require('../lib/todos')
+const { todoCountsForDates, completedDateSet } = require('../lib/todos')
 
 const router = express.Router()
 
@@ -50,28 +50,34 @@ router.get('/stats', wrap(async (_req, res) => {
     if (!completed.has(ds) && !rescues.has(ds)) recentMisses.push(ds)
   }
 
-  // 30-day completion-rate trend
-  const trend = []
+  // Collect all dates we need counts for: 30-day trend + current-month calendar.
+  const trendDates = []
   for (let i = 29; i >= 0; i--) {
     const d = new Date(end); d.setDate(d.getDate() - i)
-    const ds = localDateStr(d)
-    const todos = await getTodosForDate(ds)
-    const total = todos.length
-    const done = todos.filter(x => x.done).length
-    trend.push({ date: ds, total, done, rate: total > 0 ? Math.round((done / total) * 100) : 0 })
+    trendDates.push(localDateStr(d))
   }
-
-  // Current-month calendar
-  const calendar = []
   const cy = end.getFullYear(), cm = end.getMonth()
   const daysInMonth = new Date(cy, cm + 1, 0).getDate()
-  for (let day = 1; day <= daysInMonth; day++) {
-    const ds = localDateStr(new Date(cy, cm, day))
+  const calDates = []
+  for (let day = 1; day <= daysInMonth; day++) calDates.push(localDateStr(new Date(cy, cm, day)))
+
+  // One batched read instead of ~60 sequential getTodosForDate() calls.
+  const neededDates = [...new Set([...trendDates, ...calDates.filter(ds => ds <= t)])]
+  const counts = await todoCountsForDates(neededDates)
+  const cnt = (ds) => counts.get(ds) || { total: 0, done: 0 }
+
+  // 30-day completion-rate trend
+  const trend = trendDates.map(ds => {
+    const { total, done } = cnt(ds)
+    return { date: ds, total, done, rate: total > 0 ? Math.round((done / total) * 100) : 0 }
+  })
+
+  // Current-month calendar
+  const calendar = calDates.map((ds, idx) => {
     const isFuture = ds > t
-    let total = 0, done = 0
-    if (!isFuture) { const ts = await getTodosForDate(ds); total = ts.length; done = ts.filter(x => x.done).length }
-    calendar.push({ date: ds, day, total, done, isFuture, completed: completed.has(ds), rescued: rescues.has(ds) })
-  }
+    const { total, done } = isFuture ? { total: 0, done: 0 } : cnt(ds)
+    return { date: ds, day: idx + 1, total, done, isFuture, completed: completed.has(ds), rescued: rescues.has(ds) }
+  })
 
   // At-risk day: streak alive, yesterday missed (uncovered) → prompt to rescue.
   let atRisk = null
