@@ -100,6 +100,7 @@ async function initDB() {
       recurring INTEGER DEFAULT 0,
       recurrence_days TEXT,
       aspect TEXT,
+      duration_min INTEGER,
       created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS')
     );
 
@@ -137,6 +138,7 @@ async function initDB() {
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS recurrence_days TEXT`,
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS end_time TEXT`,
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS aspect TEXT`,
+    `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS duration_min INTEGER`,
   ]
   for (const m of migrations) {
     try { await pool.query(m) } catch (e) { console.warn('[db] migration skipped:', e.message) }

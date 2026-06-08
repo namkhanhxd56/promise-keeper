@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fmt, toDateStr, tomorrow, durationMin, fmtDuration, fmtMins, isVictory } from '../utils'
+import { fmt, toDateStr, tomorrow, fmtMins, isVictory, todoDuration } from '../utils'
 import Modal from '../components/Modal'
 import TodoForm from '../components/TodoForm'
 import AspectTag from '../components/AspectTag'
@@ -59,7 +59,7 @@ export default function Today() {
   }
 
   const done = todos.filter(t => t.done).length
-  const totalMin = todos.reduce((sum, t) => sum + (durationMin(t.scheduled_time, t.end_time) || 0), 0)
+  const totalMin = todos.reduce((sum, t) => sum + (todoDuration(t) || 0), 0)
   const victory = isVictory(done, todos.length)
 
   // Fire the firework once when the day crosses into victory
@@ -263,9 +263,9 @@ function TodoItem({ todo, onToggle, onDelete, onEdit }) {
                   : `→ ${todo.end_time.slice(0,5)}`}
             </span>
           )}
-          {durationMin(todo.scheduled_time, todo.end_time) != null && (
+          {todoDuration(todo) != null && (
             <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 6px', borderRadius: 4 }}>
-              {fmtDuration(todo.scheduled_time, todo.end_time)}
+              {fmtMins(todoDuration(todo))}
             </span>
           )}
           <AspectTag aspect={todo.aspect || todo.promise_aspect} />

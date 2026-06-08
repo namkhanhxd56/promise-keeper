@@ -8,7 +8,7 @@ const router = express.Router()
 
 const UPDATABLE = [
   'promise_id', 'step_id', 'title', 'scheduled_date', 'scheduled_time', 'end_time',
-  'done', 'snoozed', 'original_date', 'recurring', 'recurrence_days', 'aspect',
+  'done', 'snoozed', 'original_date', 'recurring', 'recurrence_days', 'aspect', 'duration_min',
 ]
 
 // GET /todos?date=YYYY-MM-DD
@@ -106,8 +106,8 @@ router.post('/', wrap(async (req, res) => {
   }
 
   const row = await q1(`
-    INSERT INTO todos (promise_id, step_id, title, scheduled_date, scheduled_time, end_time, recurring, recurrence_days, aspect)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    INSERT INTO todos (promise_id, step_id, title, scheduled_date, scheduled_time, end_time, recurring, recurrence_days, aspect, duration_min)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     RETURNING *
   `, [
     data.promise_id || null,
@@ -119,6 +119,7 @@ router.post('/', wrap(async (req, res) => {
     recurring,
     recurring ? (data.recurrence_days || null) : null,
     data.aspect || null,
+    (data.duration_min != null && data.duration_min > 0) ? data.duration_min : null,
   ])
   res.json(row)
 }))

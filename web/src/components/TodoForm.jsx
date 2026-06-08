@@ -19,7 +19,7 @@ export default function TodoForm({ initial, defaultDate, onSave, onCancel }) {
   const [durText, setDurText] = useState(
     initial?.scheduled_time && initial?.end_time
       ? String(diffMinutesRaw(initial.scheduled_time, initial.end_time))
-      : ''
+      : (initial?.duration_min != null && initial.duration_min > 0 ? String(initial.duration_min) : '')
   )
   const [promiseId, setPromiseId] = useState(initial?.promise_id || '')
   const [stepId, setStepId] = useState(initial?.step_id || '')
@@ -83,6 +83,7 @@ export default function TodoForm({ initial, defaultDate, onSave, onCancel }) {
       if (d <= 0) { alert('Giờ kết thúc phải sau giờ bắt đầu'); return }
       if (d > 16 * 60 && !confirm('Khối lượng có vẻ lớn (hơn 16 giờ). Vẫn lưu?')) return
     }
+    const durMin = (time && endTime) ? diffMinutesRaw(time, endTime) : parseDuration(durText)
     await onSave({
       title: title.trim(),
       scheduled_date: recurring ? null : (date || null),
@@ -93,6 +94,7 @@ export default function TodoForm({ initial, defaultDate, onSave, onCancel }) {
       recurring: recurring ? 1 : 0,
       recurrence_days: recurring && recDays.length > 0 ? recDays.join(',') : null,
       aspect: aspect || null,
+      duration_min: durMin != null && durMin > 0 ? durMin : null,
     })
   }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fmtDuration, durationMin, fmtMins, isVictory, toDateStr } from '../utils'
+import { fmtMins, isVictory, toDateStr, todoDuration } from '../utils'
 import AspectTag from '../components/AspectTag'
 
 // Only yesterday can still be marked done (a 1-day grace period to record what
@@ -50,7 +50,7 @@ export default function History() {
         const pct = d.total > 0 ? Math.round((d.done / d.total) * 100) : 0
         const isOpen = open[d.date]
         const editable = d.date === yesterdayStr
-        const totalMin = d.todos.reduce((sum, t) => sum + (durationMin(t.scheduled_time, t.end_time) || 0), 0)
+        const totalMin = d.todos.reduce((sum, t) => sum + (todoDuration(t) || 0), 0)
         return (
           <div key={d.date} style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 10, overflow: 'hidden' }}>
             <button onClick={() => toggle(d.date)} style={{
@@ -104,8 +104,8 @@ export default function History() {
                               : t.scheduled_time ? t.scheduled_time.slice(0,5) : `→ ${t.end_time.slice(0,5)}`}
                           </span>
                         )}
-                        {durationMin(t.scheduled_time, t.end_time) != null && (
-                          <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 6px', borderRadius: 4 }}>{fmtDuration(t.scheduled_time, t.end_time)}</span>
+                        {todoDuration(t) != null && (
+                          <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 6px', borderRadius: 4 }}>{fmtMins(todoDuration(t))}</span>
                         )}
                         <AspectTag aspect={t.aspect || t.promise_aspect} />
                         {t.recurring === 1 && <span style={{ fontSize: 11, color: 'var(--purple)', background: 'var(--purple-light)', padding: '1px 6px', borderRadius: 4 }}>↻ Thói quen</span>}

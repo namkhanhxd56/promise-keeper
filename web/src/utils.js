@@ -39,6 +39,13 @@ export function fmtDuration(start, end) {
   return fmtMins(durationMin(start, end))
 }
 
+// Effective duration (minutes) of a todo: prefer the stored value, else derive
+// from start/end. null when unknown.
+export function todoDuration(todo) {
+  if (todo && todo.duration_min != null && todo.duration_min > 0) return todo.duration_min
+  return durationMin(todo?.scheduled_time, todo?.end_time)
+}
+
 // --- Time math for the start/end/duration triad ----------------------------
 
 // "08:30" + 90 → "10:00" (clamped to a single day). '' if no base time.
