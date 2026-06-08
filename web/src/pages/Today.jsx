@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { fmt, toDateStr, tomorrow, durationMin, fmtDuration, fmtMins, isVictory } from '../utils'
 import Modal from '../components/Modal'
 import TodoForm from '../components/TodoForm'
+import AspectTag from '../components/AspectTag'
 
 export default function Today() {
   const today = toDateStr(new Date())
@@ -228,7 +229,6 @@ function Section({ label, children, muted }) {
 
 function TodoItem({ todo, onToggle, onDelete, onEdit }) {
   const [hover, setHover] = useState(false)
-  const aspectColor = { work: 'var(--blue)', family: 'var(--amber)', personal: 'var(--accent)', friend: 'var(--purple)' }
 
   return (
     <div
@@ -268,6 +268,7 @@ function TodoItem({ todo, onToggle, onDelete, onEdit }) {
               {fmtDuration(todo.scheduled_time, todo.end_time)}
             </span>
           )}
+          <AspectTag aspect={todo.aspect || todo.promise_aspect} />
           {todo.recurring === 1 && <span style={{ fontSize: 11, color: 'var(--purple)', background: 'var(--purple-light)', padding: '1px 6px', borderRadius: 4 }}>↻ Thói quen</span>}
           {todo.promise_content && (
             <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 6px', borderRadius: 4 }}>

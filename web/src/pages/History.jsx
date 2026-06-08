@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fmtDuration, durationMin, fmtMins, isVictory } from '../utils'
+import { fmtDuration, durationMin, fmtMins, isVictory, toDateStr } from '../utils'
+import AspectTag from '../components/AspectTag'
+
+// Only yesterday can still be marked done (a 1-day grace period to record what
+// you actually finished). Older days are locked read-only.
+const yesterdayStr = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return toDateStr(d) })()
 
 export default function History() {
   const [days, setDays] = useState([])
@@ -13,6 +18,11 @@ export default function History() {
   useEffect(() => { load() }, [load])
 
   const toggle = (date) => setOpen(o => ({ ...o, [date]: !o[date] }))
+
+  const toggleTodo = async (id, date) => {
+    await window.api.todos.toggle(id, date)
+    load()
+  }
 
   const totalDone = days.reduce((s, d) => s + d.done, 0)
   const totalTasks = days.reduce((s, d) => s + d.total, 0)
@@ -39,6 +49,7 @@ export default function History() {
       {days.map(d => {
         const pct = d.total > 0 ? Math.round((d.done / d.total) * 100) : 0
         const isOpen = open[d.date]
+        const editable = d.date === yesterdayStr
         const totalMin = d.todos.reduce((sum, t) => sum + (durationMin(t.scheduled_time, t.end_time) || 0), 0)
         return (
           <div key={d.date} style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 10, overflow: 'hidden' }}>
@@ -52,6 +63,9 @@ export default function History() {
                     {new Date(d.date + 'T00:00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}
                   </span>
                   {isVictory(d.done, d.total) && <span className="victory-tag sm"><span className="vt-star">⭐</span> Chiến thắng</span>}
+                  {editable
+                    ? <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 7px', borderRadius: 4, fontWeight: 500 }}>Hôm qua · có thể đánh dấu</span>
+                    : <span style={{ fontSize: 11, color: 'var(--text3)' }}>🔒</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
                   {d.done}/{d.total} việc xong{totalMin > 0 ? ` · ${fmtMins(totalMin)}` : ''}
@@ -66,16 +80,20 @@ export default function History() {
 
             {isOpen && (
               <div style={{ borderTop: '1px solid var(--border)' }}>
-                {d.todos.map(t => (
+                {d.todos.map(t => {
+                  const boxStyle = {
+                    width: 16, height: 16, minWidth: 16, borderRadius: 4, marginTop: 1, flexShrink: 0,
+                    border: `1.5px solid ${t.done ? 'var(--accent)' : 'var(--border2)'}`,
+                    background: t.done ? 'var(--accent)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: editable ? 'pointer' : 'default',
+                  }
+                  const check = t.done ? <span style={{ color: 'white', fontSize: 10 }}>✓</span> : null
+                  return (
                   <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 14px', borderBottom: '1px solid var(--border)' }}>
-                    <span style={{
-                      width: 16, height: 16, borderRadius: 4, marginTop: 1, flexShrink: 0,
-                      border: `1.5px solid ${t.done ? 'var(--accent)' : 'var(--border2)'}`,
-                      background: t.done ? 'var(--accent)' : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                      {t.done ? <span style={{ color: 'white', fontSize: 10 }}>✓</span> : null}
-                    </span>
+                    {editable
+                      ? <button onClick={() => toggleTodo(t.id, d.date)} style={boxStyle} title="Đánh dấu hoàn thành">{check}</button>
+                      : <span style={boxStyle}>{check}</span>}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, color: t.done ? 'var(--text3)' : 'var(--text)', textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -89,6 +107,7 @@ export default function History() {
                         {durationMin(t.scheduled_time, t.end_time) != null && (
                           <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 6px', borderRadius: 4 }}>{fmtDuration(t.scheduled_time, t.end_time)}</span>
                         )}
+                        <AspectTag aspect={t.aspect || t.promise_aspect} />
                         {t.recurring === 1 && <span style={{ fontSize: 11, color: 'var(--purple)', background: 'var(--purple-light)', padding: '1px 6px', borderRadius: 4 }}>↻ Thói quen</span>}
                         {t.promise_content && (
                           <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 6px', borderRadius: 4 }}>
@@ -98,7 +117,8 @@ export default function History() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
