@@ -39,6 +39,41 @@ export function fmtDuration(start, end) {
   return fmtMins(durationMin(start, end))
 }
 
+// --- Time math for the start/end/duration triad ----------------------------
+
+// "08:30" + 90 → "10:00" (clamped to a single day). '' if no base time.
+export function addMinutes(timeStr, minutes) {
+  if (!timeStr) return ''
+  const [h, m] = timeStr.split(':').map(Number)
+  let total = h * 60 + m + Number(minutes)
+  total = Math.max(0, Math.min(24 * 60 - 1, total))
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+// "10:00" - 90 → "08:30"
+export function subMinutes(timeStr, minutes) {
+  return addMinutes(timeStr, -Number(minutes))
+}
+
+// Signed end - start in minutes (can be ≤ 0). null if either side missing.
+export function diffMinutesRaw(start, end) {
+  if (!start || !end) return null
+  const [sh, sm] = start.split(':').map(Number)
+  const [eh, em] = end.split(':').map(Number)
+  return (eh * 60 + em) - (sh * 60 + sm)
+}
+
+// Parse a duration the user typed: "90" → 90 phút, "1.5"/"1,5" → 90 phút.
+// null when blank/invalid.
+export function parseDuration(str) {
+  if (str == null) return null
+  const s = String(str).trim().replace(',', '.')
+  if (s === '') return null
+  const n = parseFloat(s)
+  if (Number.isNaN(n)) return null
+  return s.includes('.') ? Math.round(n * 60) : Math.round(n)
+}
+
 // A day is a "Ngày Chiến Thắng" (Victory Day) when ≥90% of its tasks are done.
 export const VICTORY_PCT = 90
 export function isVictory(done, total) {

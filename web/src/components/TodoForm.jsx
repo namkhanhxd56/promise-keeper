@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fmtDuration, ASPECTS } from '../utils'
+import { ASPECTS, fmtMins, addMinutes, subMinutes, diffMinutesRaw, parseDuration } from '../utils'
 
 const DAYS = [
   { id: 'mon', label: 'T2' },
@@ -16,6 +16,11 @@ export default function TodoForm({ initial, defaultDate, onSave, onCancel }) {
   const [date, setDate] = useState(initial?.scheduled_date || defaultDate || '')
   const [time, setTime] = useState(initial?.scheduled_time || '')
   const [endTime, setEndTime] = useState(initial?.end_time || '')
+  const [durText, setDurText] = useState(
+    initial?.scheduled_time && initial?.end_time
+      ? String(diffMinutesRaw(initial.scheduled_time, initial.end_time))
+      : ''
+  )
   const [promiseId, setPromiseId] = useState(initial?.promise_id || '')
   const [stepId, setStepId] = useState(initial?.step_id || '')
   const [promises, setPromises] = useState([])
@@ -45,13 +50,39 @@ export default function TodoForm({ initial, defaultDate, onSave, onCancel }) {
     setTitle(s.title)
     setTime(s.start_time || '')
     setEndTime(s.end_time || '')
+    setDurText(s.start_time && s.end_time ? String(diffMinutesRaw(s.start_time, s.end_time)) : '')
   }, [stepId, steps])
+
+  // start + duration = end. Edit any one of the three → recompute another.
+  const onChangeStart = (val) => {
+    setTime(val)
+    const dur = parseDuration(durText)
+    if (val && dur != null) setEndTime(addMinutes(val, dur))         // keep duration → recompute end
+    else if (val && endTime) setDurText(String(diffMinutesRaw(val, endTime)))
+  }
+  const onChangeEnd = (val) => {
+    setEndTime(val)
+    const dur = parseDuration(durText)
+    if (val && time) setDurText(String(diffMinutesRaw(time, val)))   // keep start → recompute duration
+    else if (val && dur != null) setTime(subMinutes(val, dur))
+  }
+  const onChangeDuration = (val) => {
+    setDurText(val)
+    const dur = parseDuration(val)
+    if (dur != null && time) setEndTime(addMinutes(time, dur))       // priority: keep start → recompute end
+    else if (dur != null && endTime) setTime(subMinutes(endTime, dur))
+  }
 
   const toggleDay = (d) => setRecDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
 
   const handleSave = async () => {
     if (!title.trim()) { alert('Vui lòng nhập tên việc cần làm'); return }
     if (recurring && recDays.length === 0) { alert('Chọn ít nhất 1 ngày trong tuần cho thói quen'); return }
+    if (time && endTime) {
+      const d = diffMinutesRaw(time, endTime)
+      if (d <= 0) { alert('Giờ kết thúc phải sau giờ bắt đầu'); return }
+      if (d > 16 * 60 && !confirm('Khối lượng có vẻ lớn (hơn 16 giờ). Vẫn lưu?')) return
+    }
     await onSave({
       title: title.trim(),
       scheduled_date: recurring ? null : (date || null),
@@ -123,26 +154,40 @@ export default function TodoForm({ initial, defaultDate, onSave, onCancel }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-end' }}>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Giờ bắt đầu</label>
-          <input type="time" value={time} onChange={e => setTime(e.target.value)} />
+          <input type="time" value={time} onChange={e => onChangeStart(e.target.value)} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Giờ hoàn thành</label>
-          <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+          <input type="time" value={endTime} onChange={e => onChangeEnd(e.target.value)} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Khối lượng</label>
-          <div style={{
-            height: 38, display: 'flex', alignItems: 'center', padding: '0 10px',
-            borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)',
-            fontSize: 13, color: fmtDuration(time, endTime) ? 'var(--accent)' : 'var(--text3)'
-          }}>
-            {fmtDuration(time, endTime) || '—'}
-          </div>
+          <input type="text" inputMode="decimal" value={durText}
+            onChange={e => onChangeDuration(e.target.value)}
+            placeholder="vd 90 hoặc 1.5" />
         </div>
       </div>
+      {(() => {
+        const durMin = parseDuration(durText)
+        const rangeErr = time && endTime && diffMinutesRaw(time, endTime) <= 0
+        const big = durMin != null && durMin > 16 * 60
+        const summary = time && endTime
+          ? `${time.slice(0,5)} → ${endTime.slice(0,5)}`
+          : time ? `Bắt đầu ${time.slice(0,5)}` : endTime ? `Kết thúc ${endTime.slice(0,5)}` : ''
+        const durLabel = durMin != null && durMin > 0 ? fmtMins(durMin) : ''
+        if (!summary && !durLabel) return <div style={{ marginBottom: 12 }} />
+        return (
+          <div style={{ fontSize: 11, marginBottom: 12, color: rangeErr ? 'var(--red)' : 'var(--text3)' }}>
+            {rangeErr
+              ? '⚠ Giờ kết thúc phải sau giờ bắt đầu'
+              : `${summary}${summary && durLabel ? ' · ' : ''}${durLabel}${big ? '  ⚠ khối lượng lớn' : ''}`}
+            <span style={{ color: 'var(--text3)', marginLeft: 8 }}>· nhập 1 ô, 2 ô kia tự tính</span>
+          </div>
+        )
+      })()}
 
       <div style={{ marginBottom: 14 }}>
         <label style={labelStyle}>Gắn với lời hứa (optional)</label>
