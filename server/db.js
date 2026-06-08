@@ -20,6 +20,12 @@ const pool = new Pool({
   ssl,
   // Anchor every session's clock to the app timezone so now()/to_char align with Node.
   options: `-c timezone=${APP_TZ}`,
+  // Keep connections warm + reused so each request doesn't pay a fresh
+  // TCP/TLS handshake (costly when the DB is across the network).
+  keepAlive: true,
+  max: 5,
+  idleTimeoutMillis: 60000,
+  connectionTimeoutMillis: 10000,
 })
 
 pool.on('error', (err) => console.error('[db] unexpected pool error', err))
