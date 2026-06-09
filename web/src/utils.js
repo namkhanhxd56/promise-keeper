@@ -111,6 +111,21 @@ export function aspectLabel(id) {
   return ASPECTS.find(a => a.id === id)?.label || ''
 }
 
+// Daily mood (cảm xúc) options for the "Hôm nay" review. id 1..5.
+export const MOODS = [
+  { id: 1, icon: '😞', label: 'Tệ' },
+  { id: 2, icon: '😕', label: 'Không vui' },
+  { id: 3, icon: '😐', label: 'Bình thường' },
+  { id: 4, icon: '🙂', label: 'Vui' },
+  { id: 5, icon: '😄', label: 'Tuyệt vời' },
+]
+export function moodIcon(id) {
+  return MOODS.find(m => m.id === Number(id))?.icon || ''
+}
+export function moodLabel(id) {
+  return MOODS.find(m => m.id === Number(id))?.label || ''
+}
+
 export function daysLeft(deadlineStr) {
   if (!deadlineStr) return null
   const today = new Date()

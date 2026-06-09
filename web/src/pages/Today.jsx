@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fmt, toDateStr, tomorrow, fmtMins, isVictory, todoDuration } from '../utils'
+import { fmt, toDateStr, tomorrow, fmtMins, isVictory, todoDuration, MOODS } from '../utils'
 import Modal from '../components/Modal'
 import TodoForm from '../components/TodoForm'
 import AspectTag from '../components/AspectTag'
@@ -159,6 +159,9 @@ export default function Today() {
         </div>
       )}
 
+      {/* Daily review — note + mood at the bottom of the day */}
+      <DailyReview date={today} />
+
       <Modal open={addOpen} onClose={() => { setAddOpen(false); setEditTodo(null) }} title={editTodo ? 'Sửa việc' : 'Thêm việc hôm nay'}>
         <TodoForm
           initial={editTodo}
@@ -297,6 +300,84 @@ function PastItem({ todo, onSnooze, onDone, onDelete }) {
       <button onClick={onDone} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, background: 'var(--accent-light)', color: 'var(--accent)', fontWeight: 500 }}>Xong rồi</button>
       <button onClick={onSnooze} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, background: 'var(--bg3)', color: 'var(--text2)' }}>→ Ngày mai</button>
       <button onClick={onDelete} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, color: 'var(--red)', background: 'var(--red-light)' }}>Xoá</button>
+    </div>
+  )
+}
+
+function DailyReview({ date }) {
+  const [note, setNote] = useState('')
+  const [mood, setMood] = useState(null)
+  const [loaded, setLoaded] = useState(false)
+  const [savedAt, setSavedAt] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    window.api.reviews.get(date).then(r => {
+      if (!alive) return
+      setNote(r?.note || '')
+      setMood(r?.mood ?? null)
+      setLoaded(true)
+    }).catch(() => setLoaded(true))
+    return () => { alive = false }
+  }, [date])
+
+  const save = async (nextNote = note, nextMood = mood) => {
+    await window.api.reviews.save(date, { note: nextNote || null, mood: nextMood })
+    setSavedAt(true)
+    setTimeout(() => setSavedAt(false), 1800)
+  }
+
+  const pickMood = (id) => {
+    const next = mood === id ? null : id
+    setMood(next)
+    save(note, next) // mood picks save immediately
+  }
+
+  return (
+    <div style={{ marginTop: 8, marginBottom: 24, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '16px 18px' }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+        Bài học - Tâm đắc - Ngộ ra hôm nay của bạn là gì?
+      </div>
+      <textarea
+        value={note}
+        onChange={e => setNote(e.target.value)}
+        onBlur={() => loaded && save()}
+        placeholder="Viết lại điều bạn học được, tâm đắc hay ngộ ra hôm nay..."
+        rows={4}
+        style={{ width: '100%', resize: 'vertical', lineHeight: 1.5 }}
+      />
+
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginTop: 16, marginBottom: 8 }}>
+        Hôm nay bạn cảm thấy thế nào?
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {MOODS.map(m => {
+          const active = mood === m.id
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => pickMood(m.id)}
+              title={m.label}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                padding: '8px 10px', borderRadius: 10, minWidth: 56,
+                border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border2)'}`,
+                background: active ? 'var(--accent-light)' : 'transparent',
+                transition: 'all 0.12s', transform: active ? 'translateY(-2px)' : 'none',
+              }}
+            >
+              <span style={{ fontSize: 24, lineHeight: 1, filter: active ? 'none' : 'grayscale(0.4)', opacity: active ? 1 : 0.75 }}>{m.icon}</span>
+              <span style={{ fontSize: 10, color: active ? 'var(--accent)' : 'var(--text3)', fontWeight: active ? 600 : 400 }}>{m.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+        <button onClick={() => save()} style={btnPrimary}>Lưu review</button>
+        {savedAt && <span style={{ fontSize: 12, color: 'var(--accent)' }}>Đã lưu ✓</span>}
+      </div>
     </div>
   )
 }

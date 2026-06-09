@@ -119,6 +119,15 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS streak_rescues (
       date TEXT PRIMARY KEY
     );
+
+    CREATE TABLE IF NOT EXISTS daily_reviews (
+      date TEXT PRIMARY KEY,
+      user_id INTEGER DEFAULT 1,
+      note TEXT,
+      mood INTEGER,
+      created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS'),
+      updated_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS')
+    );
   `)
 
   // Forward migrations (no-ops once columns exist). Kept for already-deployed DBs.

@@ -20,6 +20,7 @@ app.use('/', require('./routes/steps'))        // /promises/:id/steps and /steps
 app.use('/todos', require('./routes/todos'))
 app.use('/integrity', require('./routes/integrity'))
 app.use('/streak', require('./routes/streak'))
+app.use('/reviews', require('./routes/reviews'))
 
 // 404
 app.use((req, res) => res.status(404).json({ error: `Not found: ${req.method} ${req.path}` }))

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fmtMins, isVictory, toDateStr, todoDuration } from '../utils'
+import { fmtMins, isVictory, toDateStr, todoDuration, moodIcon, moodLabel } from '../utils'
 import AspectTag from '../components/AspectTag'
 
 // Only yesterday can still be marked done (a 1-day grace period to record what
@@ -62,6 +62,7 @@ export default function History() {
                   <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500, textTransform: 'capitalize' }}>
                     {new Date(d.date + 'T00:00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}
                   </span>
+                  {d.mood && <span title={moodLabel(d.mood)} style={{ fontSize: 16, lineHeight: 1 }}>{moodIcon(d.mood)}</span>}
                   {isVictory(d.done, d.total) && <span className="victory-tag sm"><span className="vt-star">⭐</span> Chiến thắng</span>}
                   {editable
                     ? <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 7px', borderRadius: 4, fontWeight: 500 }}>Hôm qua · có thể đánh dấu</span>
@@ -80,6 +81,15 @@ export default function History() {
 
             {isOpen && (
               <div style={{ borderTop: '1px solid var(--border)' }}>
+                {(d.note || d.mood) && (
+                  <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                      <span>Review</span>
+                      {d.mood && <span style={{ fontSize: 15 }}>{moodIcon(d.mood)}</span>}
+                    </div>
+                    {d.note && <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 5, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{d.note}</div>}
+                  </div>
+                )}
                 {d.todos.map(t => {
                   const boxStyle = {
                     width: 16, height: 16, minWidth: 16, borderRadius: 4, marginTop: 1, flexShrink: 0,

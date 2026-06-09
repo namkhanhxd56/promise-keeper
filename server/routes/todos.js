@@ -20,6 +20,10 @@ router.get('/', wrap(async (req, res) => {
 
 // GET /todos/history — past days (before today) that had todos, newest first
 router.get('/history', wrap(async (_req, res) => {
+  // Daily reviews (note + mood) keyed by date, attached to each day below.
+  const reviews = new Map(
+    (await q('SELECT date, note, mood FROM daily_reviews')).map(r => [r.date, r])
+  )
   const days = []
   for (let i = 1; i <= 60; i++) {
     const d = new Date(); d.setDate(d.getDate() - i)
@@ -27,7 +31,8 @@ router.get('/history', wrap(async (_req, res) => {
     const todos = await getTodosForDate(date)
     if (todos.length === 0) continue
     const done = todos.filter(t => t.done).length
-    days.push({ date, total: todos.length, done, todos })
+    const rv = reviews.get(date)
+    days.push({ date, total: todos.length, done, todos, mood: rv?.mood ?? null, note: rv?.note ?? null })
   }
   res.json(days)
 }))

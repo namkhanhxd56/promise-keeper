@@ -69,5 +69,9 @@ export function createHttpApi() {
       stats: () => get('/streak/stats'),
       rescue: (date) => http('POST', '/streak/rescue', { date }),
     },
+    reviews: {
+      get: (date) => get(`/reviews/${date}`),
+      save: (date, data) => http('PUT', `/reviews/${date}`, data),
+    },
   }
 }
