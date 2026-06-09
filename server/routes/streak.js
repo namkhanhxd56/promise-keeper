@@ -9,13 +9,14 @@ const router = express.Router()
 // A day "counts" (active) when it has >=1 completed todo.
 // Streak breaks on 2 consecutive missed days, unless a day is rescued (max 2 / month).
 // GET /streak/stats
-router.get('/stats', wrap(async (_req, res) => {
+router.get('/stats', wrap(async (req, res) => {
   const t = today()
-  const completed = await completedDateSet()
-  const rescues = new Set((await q(`SELECT date FROM streak_rescues`)).map(r => r.date))
+  const u = req.userId
+  const completed = await completedDateSet(u)
+  const rescues = new Set((await q(`SELECT date FROM streak_rescues WHERE user_id = $1`, [u])).map(r => r.date))
 
-  const minTodo = (await q1(`SELECT MIN(scheduled_date) m FROM todos WHERE scheduled_date IS NOT NULL`))?.m
-  const minComp = (await q1(`SELECT MIN(date) m FROM todo_completions`))?.m
+  const minTodo = (await q1(`SELECT MIN(scheduled_date) m FROM todos WHERE user_id = $1 AND scheduled_date IS NOT NULL`, [u]))?.m
+  const minComp = (await q1(`SELECT MIN(c.date) m FROM todo_completions c JOIN todos t ON c.todo_id = t.id WHERE t.user_id = $1`, [u]))?.m
   const firstDate = [minTodo, minComp].filter(Boolean).sort()[0] || t
 
   const end = new Date(t + 'T00:00:00')
@@ -38,7 +39,7 @@ router.get('/stats', wrap(async (_req, res) => {
   const current = run
   const consistency = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0
   const curMonth = t.slice(0, 7)
-  const rescuesThisMonth = (await q1(`SELECT COUNT(*)::int c FROM streak_rescues WHERE substr(date,1,7) = $1`, [curMonth])).c
+  const rescuesThisMonth = (await q1(`SELECT COUNT(*)::int c FROM streak_rescues WHERE user_id = $2 AND substr(date,1,7) = $1`, [curMonth, u])).c
   const rescuesLeft = Math.max(0, 2 - rescuesThisMonth)
 
   // Recent missed (uncovered) days, last 14 days excluding today
@@ -63,7 +64,7 @@ router.get('/stats', wrap(async (_req, res) => {
 
   // One batched read instead of ~60 sequential getTodosForDate() calls.
   const neededDates = [...new Set([...trendDates, ...calDates.filter(ds => ds <= t)])]
-  const counts = await todoCountsForDates(neededDates)
+  const counts = await todoCountsForDates(neededDates, u)
   const cnt = (ds) => counts.get(ds) || { total: 0, done: 0 }
 
   // 30-day completion-rate trend
@@ -96,10 +97,11 @@ router.get('/stats', wrap(async (_req, res) => {
 // POST /streak/rescue  { date }
 router.post('/rescue', wrap(async (req, res) => {
   const date = req.body?.date
+  const u = req.userId
   const curMonth = today().slice(0, 7)
-  const used = (await q1(`SELECT COUNT(*)::int c FROM streak_rescues WHERE substr(date,1,7) = $1`, [curMonth])).c
+  const used = (await q1(`SELECT COUNT(*)::int c FROM streak_rescues WHERE user_id = $2 AND substr(date,1,7) = $1`, [curMonth, u])).c
   if (used >= 2) return res.status(400).json({ error: 'Hết lượt cứu streak tháng này' })
-  await q(`INSERT INTO streak_rescues (date) VALUES ($1) ON CONFLICT DO NOTHING`, [date])
+  await q(`INSERT INTO streak_rescues (user_id, date) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [u, date])
   res.json({ ok: true })
 }))
 

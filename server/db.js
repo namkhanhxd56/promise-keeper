@@ -42,9 +42,20 @@ async function q1(text, params) {
 // Create schema + run idempotent migrations. Safe to run on every boot.
 async function initDB() {
   await pool.query(`
+    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,           -- bcrypt hash, never plaintext
+      salt TEXT,                        -- reserved for future PBKDF2 / E2EE
+      encryption_version INT DEFAULT 1, -- 1 = plain, 2 = E2EE
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS people (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER DEFAULT 1,
+      user_id TEXT,
       name TEXT NOT NULL,
       relation TEXT DEFAULT 'other',
       created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS')
@@ -52,7 +63,7 @@ async function initDB() {
 
     CREATE TABLE IF NOT EXISTS promises (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER DEFAULT 1,
+      user_id TEXT,
       person_id INTEGER REFERENCES people(id),
       person_name TEXT,
       content TEXT NOT NULL,
@@ -87,7 +98,7 @@ async function initDB() {
 
     CREATE TABLE IF NOT EXISTS todos (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER DEFAULT 1,
+      user_id TEXT,
       promise_id INTEGER REFERENCES promises(id) ON DELETE SET NULL,
       step_id INTEGER REFERENCES steps(id) ON DELETE SET NULL,
       title TEXT NOT NULL,
@@ -117,12 +128,13 @@ async function initDB() {
     );
 
     CREATE TABLE IF NOT EXISTS streak_rescues (
-      date TEXT PRIMARY KEY
+      user_id TEXT NOT NULL,
+      date TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS daily_reviews (
-      date TEXT PRIMARY KEY,
-      user_id INTEGER DEFAULT 1,
+      user_id TEXT NOT NULL,
+      date TEXT NOT NULL,
       note TEXT,
       mood INTEGER,
       created_at TEXT DEFAULT to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS'),
@@ -130,17 +142,16 @@ async function initDB() {
     );
   `)
 
-  // Forward migrations (no-ops once columns exist). Kept for already-deployed DBs.
+  // Forward migrations (no-ops once applied). Kept for already-deployed DBs.
+  // Each runs independently; failures are logged but don't abort boot.
   const migrations = [
-    `ALTER TABLE people   ADD COLUMN IF NOT EXISTS user_id INTEGER DEFAULT 1`,
-    `ALTER TABLE promises ADD COLUMN IF NOT EXISTS user_id INTEGER DEFAULT 1`,
+    // Column back-fills from earlier versions
     `ALTER TABLE promises ADD COLUMN IF NOT EXISTS deadline_time TEXT`,
     `ALTER TABLE promises ADD COLUMN IF NOT EXISTS integrity_note TEXT`,
     `ALTER TABLE steps    ADD COLUMN IF NOT EXISTS start_date TEXT`,
     `ALTER TABLE steps    ADD COLUMN IF NOT EXISTS end_date TEXT`,
     `ALTER TABLE steps    ADD COLUMN IF NOT EXISTS start_time TEXT`,
     `ALTER TABLE steps    ADD COLUMN IF NOT EXISTS end_time TEXT`,
-    `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS user_id INTEGER DEFAULT 1`,
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS snoozed INTEGER DEFAULT 0`,
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS original_date TEXT`,
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS recurring INTEGER DEFAULT 0`,
@@ -148,21 +159,42 @@ async function initDB() {
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS end_time TEXT`,
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS aspect TEXT`,
     `ALTER TABLE todos    ADD COLUMN IF NOT EXISTS duration_min INTEGER`,
+
+    // --- Auth v1: per-user ownership ---------------------------------------
+    // Ensure user_id columns exist everywhere (older DBs had them as INTEGER).
+    `ALTER TABLE people         ADD COLUMN IF NOT EXISTS user_id TEXT`,
+    `ALTER TABLE promises       ADD COLUMN IF NOT EXISTS user_id TEXT`,
+    `ALTER TABLE todos          ADD COLUMN IF NOT EXISTS user_id TEXT`,
+    `ALTER TABLE daily_reviews  ADD COLUMN IF NOT EXISTS user_id TEXT`,
+    `ALTER TABLE streak_rescues ADD COLUMN IF NOT EXISTS user_id TEXT`,
+    // Drop the old INTEGER default and widen to TEXT (UUID). No-op if already TEXT.
+    `ALTER TABLE people         ALTER COLUMN user_id DROP DEFAULT`,
+    `ALTER TABLE promises       ALTER COLUMN user_id DROP DEFAULT`,
+    `ALTER TABLE todos          ALTER COLUMN user_id DROP DEFAULT`,
+    `ALTER TABLE daily_reviews  ALTER COLUMN user_id DROP DEFAULT`,
+    `ALTER TABLE people         ALTER COLUMN user_id TYPE TEXT USING user_id::text`,
+    `ALTER TABLE promises       ALTER COLUMN user_id TYPE TEXT USING user_id::text`,
+    `ALTER TABLE todos          ALTER COLUMN user_id TYPE TEXT USING user_id::text`,
+    `ALTER TABLE daily_reviews  ALTER COLUMN user_id TYPE TEXT USING user_id::text`,
+    // Tag legacy rows with sentinel '1' so the first account can claim them.
+    `UPDATE people         SET user_id = '1' WHERE user_id IS NULL`,
+    `UPDATE promises       SET user_id = '1' WHERE user_id IS NULL`,
+    `UPDATE todos          SET user_id = '1' WHERE user_id IS NULL`,
+    `UPDATE daily_reviews  SET user_id = '1' WHERE user_id IS NULL`,
+    `UPDATE streak_rescues SET user_id = '1' WHERE user_id IS NULL`,
+    // Re-key the two date-only tables to be unique PER USER, not globally.
+    `ALTER TABLE daily_reviews  DROP CONSTRAINT IF EXISTS daily_reviews_pkey`,
+    `ALTER TABLE streak_rescues DROP CONSTRAINT IF EXISTS streak_rescues_pkey`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS daily_reviews_user_date ON daily_reviews(user_id, date)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS streak_rescues_user_date ON streak_rescues(user_id, date)`,
+    // Helpful filtering indexes
+    `CREATE INDEX IF NOT EXISTS promises_user_idx ON promises(user_id)`,
+    `CREATE INDEX IF NOT EXISTS todos_user_idx ON todos(user_id)`,
+    `CREATE INDEX IF NOT EXISTS people_user_idx ON people(user_id)`,
   ]
   for (const m of migrations) {
     try { await pool.query(m) } catch (e) { console.warn('[db] migration skipped:', e.message) }
   }
-
-  // Seed the default "self" person (id = 1) and align the id sequence.
-  await pool.query(`
-    INSERT INTO people (id, name, relation, user_id)
-    VALUES (1, 'Tôi (bản thân)', 'self', 1)
-    ON CONFLICT (id) DO NOTHING
-  `)
-  await pool.query(`
-    SELECT setval(pg_get_serial_sequence('people','id'),
-      GREATEST((SELECT COALESCE(MAX(id),1) FROM people), 1))
-  `)
 
   console.log('[db] schema ready')
 }

@@ -6,27 +6,29 @@ const { today } = require('../lib/dates')
 const router = express.Router()
 
 // GET /integrity/score
-router.get('/score', wrap(async (_req, res) => {
+router.get('/score', wrap(async (req, res) => {
   const t = today()
+  const u = req.userId
   const futureCond = `status = 'active' AND deadline IS NOT NULL AND deadline > $1`
 
   const total = (await q1(`
     SELECT COUNT(*)::int AS c FROM promises
-    WHERE status NOT IN ('draft','deleted') AND NOT (${futureCond})
-  `, [t])).c
-  const kept = (await q1(`SELECT COUNT(*)::int AS c FROM promises WHERE status = 'done'`)).c
-  const broken = (await q1(`SELECT COUNT(*)::int AS c FROM promises WHERE status = 'broken'`)).c
-  const upcoming = (await q1(`SELECT COUNT(*)::int AS c FROM promises WHERE ${futureCond}`, [t])).c
+    WHERE user_id = $2 AND status NOT IN ('draft','deleted') AND NOT (${futureCond})
+  `, [t, u])).c
+  const kept = (await q1(`SELECT COUNT(*)::int AS c FROM promises WHERE user_id = $1 AND status = 'done'`, [u])).c
+  const broken = (await q1(`SELECT COUNT(*)::int AS c FROM promises WHERE user_id = $1 AND status = 'broken'`, [u])).c
+  const upcoming = (await q1(`SELECT COUNT(*)::int AS c FROM promises WHERE user_id = $2 AND ${futureCond}`, [t, u])).c
 
-  const todoTotal = (await q1(`SELECT COUNT(*)::int AS c FROM todos WHERE scheduled_date <= $1 AND COALESCE(recurring,0) = 0`, [t])).c
-  const todoDone = (await q1(`SELECT COUNT(*)::int AS c FROM todos WHERE scheduled_date <= $1 AND done = 1 AND COALESCE(recurring,0) = 0`, [t])).c
+  const todoTotal = (await q1(`SELECT COUNT(*)::int AS c FROM todos WHERE user_id = $2 AND scheduled_date <= $1 AND COALESCE(recurring,0) = 0`, [t, u])).c
+  const todoDone = (await q1(`SELECT COUNT(*)::int AS c FROM todos WHERE user_id = $2 AND scheduled_date <= $1 AND done = 1 AND COALESCE(recurring,0) = 0`, [t, u])).c
 
   res.json({ total, kept, broken, upcoming, todoTotal, todoDone })
 }))
 
 // GET /integrity/monthly
-router.get('/monthly', wrap(async (_req, res) => {
+router.get('/monthly', wrap(async (req, res) => {
   const t = today()
+  const u = req.userId
   const curMonth = t.slice(0, 7)
 
   const map = {}
@@ -39,8 +41,8 @@ router.get('/monthly', wrap(async (_req, res) => {
   const promiseRows = await q(`
     SELECT substr(COALESCE(deadline, substr(created_at,1,10)), 1, 7) AS month, status, deadline
     FROM promises
-    WHERE status NOT IN ('draft','deleted')
-  `)
+    WHERE user_id = $1 AND status NOT IN ('draft','deleted')
+  `, [u])
   for (const r of promiseRows) {
     const b = ensure(r.month)
     const isFuture = r.status === 'active' && r.deadline && r.deadline > t
@@ -53,8 +55,8 @@ router.get('/monthly', wrap(async (_req, res) => {
   const todoRows = await q(`
     SELECT substr(scheduled_date, 1, 7) AS month, done
     FROM todos
-    WHERE scheduled_date IS NOT NULL AND scheduled_date <= $1 AND COALESCE(recurring,0) = 0
-  `, [t])
+    WHERE user_id = $2 AND scheduled_date IS NOT NULL AND scheduled_date <= $1 AND COALESCE(recurring,0) = 0
+  `, [t, u])
   for (const r of todoRows) {
     const b = ensure(r.month)
     b.todoTotal++

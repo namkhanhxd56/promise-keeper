@@ -2,25 +2,25 @@ const { q, q1 } = require('../db')
 const { weekdayId } = require('./dates')
 
 // Build the ordered list of todos for a given date (one-off + recurring habits).
-// Ported from the Electron main process (better-sqlite3) to async pg.
-async function getTodosForDate(date) {
+// Scoped to a single user.
+async function getTodosForDate(date, userId) {
   const normal = await q(`
     SELECT t.*, p.content AS promise_content, p.aspect AS promise_aspect
     FROM todos t
     LEFT JOIN promises p ON t.promise_id = p.id
-    WHERE t.scheduled_date = $1 AND t.snoozed = 0 AND COALESCE(t.recurring,0) = 0
-  `, [date])
+    WHERE t.user_id = $2 AND t.scheduled_date = $1 AND t.snoozed = 0 AND COALESCE(t.recurring,0) = 0
+  `, [date, userId])
 
   const wd = weekdayId(date)
   const recRows = await q(`
     SELECT t.*, p.content AS promise_content, p.aspect AS promise_aspect
     FROM todos t
     LEFT JOIN promises p ON t.promise_id = p.id
-    WHERE COALESCE(t.recurring,0) = 1
+    WHERE t.user_id = $3 AND COALESCE(t.recurring,0) = 1
       AND (',' || t.recurrence_days || ',') LIKE $1
       AND substr(t.created_at, 1, 10) <= $2
-      AND t.id NOT IN (SELECT todo_id FROM todo_skips WHERE date = $3)
-  `, ['%,' + wd + ',%', date, date])
+      AND t.id NOT IN (SELECT todo_id FROM todo_skips WHERE date = $2)
+  `, ['%,' + wd + ',%', date, userId])
 
   const recurring = []
   for (const t of recRows) {
@@ -44,16 +44,13 @@ async function getTodosForDate(date) {
   return all
 }
 
-// Batched version of getTodosForDate for many dates at once.
-// Returns Map<dateStr, { total, done }>. Replaces calling getTodosForDate in a
-// loop (which fired ~2-3 queries per day → dozens of network round-trips).
-// Here we read all relevant rows in ~5 queries and compute counts in memory.
-async function todoCountsForDates(dates) {
+// Batched version of getTodosForDate for many dates at once (one user).
+// Returns Map<dateStr, { total, done }>.
+async function todoCountsForDates(dates, userId) {
   const result = new Map()
   if (!dates.length) return result
   for (const d of dates) result.set(d, { total: 0, done: 0 })
 
-  const dateSet = new Set(dates)
   let minDate = dates[0], maxDate = dates[0]
   for (const d of dates) { if (d < minDate) minDate = d; if (d > maxDate) maxDate = d }
 
@@ -61,9 +58,9 @@ async function todoCountsForDates(dates) {
   const normal = await q(`
     SELECT scheduled_date, done
     FROM todos
-    WHERE snoozed = 0 AND COALESCE(recurring,0) = 0
+    WHERE user_id = $3 AND snoozed = 0 AND COALESCE(recurring,0) = 0
       AND scheduled_date BETWEEN $1 AND $2
-  `, [minDate, maxDate])
+  `, [minDate, maxDate, userId])
   for (const t of normal) {
     const c = result.get(t.scheduled_date)
     if (!c) continue
@@ -71,14 +68,18 @@ async function todoCountsForDates(dates) {
     if (t.done) c.done++
   }
 
-  // 2) Recurring habits + their skips/completions (loaded once)
+  // 2) Recurring habits + their skips/completions (loaded once, this user only)
   const recurring = await q(`
     SELECT id, recurrence_days, substr(created_at,1,10) AS created_day
     FROM todos
-    WHERE COALESCE(recurring,0) = 1
-  `)
-  const skips = new Set((await q(`SELECT todo_id, date FROM todo_skips`)).map(r => r.todo_id + '|' + r.date))
-  const comps = new Set((await q(`SELECT todo_id, date FROM todo_completions`)).map(r => r.todo_id + '|' + r.date))
+    WHERE user_id = $1 AND COALESCE(recurring,0) = 1
+  `, [userId])
+  const skips = new Set((await q(
+    `SELECT s.todo_id, s.date FROM todo_skips s JOIN todos t ON s.todo_id = t.id WHERE t.user_id = $1`, [userId]
+  )).map(r => r.todo_id + '|' + r.date))
+  const comps = new Set((await q(
+    `SELECT c.todo_id, c.date FROM todo_completions c JOIN todos t ON c.todo_id = t.id WHERE t.user_id = $1`, [userId]
+  )).map(r => r.todo_id + '|' + r.date))
 
   for (const d of dates) {
     const wd = weekdayId(d)
@@ -95,11 +96,17 @@ async function todoCountsForDates(dates) {
   return result
 }
 
-// Set of dates that "count" as active (>=1 completed todo).
-async function completedDateSet() {
+// Set of dates that "count" as active (>=1 completed todo) for one user.
+async function completedDateSet(userId) {
   const set = new Set()
-  for (const r of await q(`SELECT DISTINCT scheduled_date d FROM todos WHERE done = 1 AND scheduled_date IS NOT NULL AND COALESCE(recurring,0) = 0`)) set.add(r.d)
-  for (const r of await q(`SELECT DISTINCT date d FROM todo_completions`)) set.add(r.d)
+  for (const r of await q(
+    `SELECT DISTINCT scheduled_date d FROM todos WHERE user_id = $1 AND done = 1 AND scheduled_date IS NOT NULL AND COALESCE(recurring,0) = 0`,
+    [userId]
+  )) set.add(r.d)
+  for (const r of await q(
+    `SELECT DISTINCT c.date d FROM todo_completions c JOIN todos t ON c.todo_id = t.id WHERE t.user_id = $1`,
+    [userId]
+  )) set.add(r.d)
   return set
 }
 

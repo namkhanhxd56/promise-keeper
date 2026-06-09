@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Today from './pages/Today'
 import Promises from './pages/Promises'
 import Plans from './pages/Plans'
 import Habits from './pages/Habits'
 import History from './pages/History'
 import Integrity from './pages/Integrity'
+import AuthScreen from './components/AuthScreen'
 
 const NAV = [
   { id: 'today', label: 'Hôm nay', icon: '◎' },
@@ -15,7 +16,45 @@ const NAV = [
   { id: 'integrity', label: 'Integrity', icon: '◈' },
 ]
 
+// The desktop (Electron) build is single-user and has no auth layer.
+const HAS_AUTH = !!(window.api && window.api.auth)
+
 export default function App() {
+  // auth: 'loading' until we know; null = signed out; object = signed-in user.
+  const [user, setUser] = useState(HAS_AUTH ? undefined : { desktop: true })
+
+  // Restore the session on first load (cookie → /auth/me, with refresh fallback).
+  useEffect(() => {
+    if (!HAS_AUTH) return
+    let alive = true
+    window.api.auth.me()
+      .then(res => { if (alive) setUser(res.user) })
+      .catch(() => { if (alive) setUser(null) })
+    const onLogout = () => setUser(null)
+    window.addEventListener('auth:logout', onLogout)
+    return () => { alive = false; window.removeEventListener('auth:logout', onLogout) }
+  }, [])
+
+  const logout = useCallback(async () => {
+    try { await window.api.auth.logout() } catch { /* ignore */ }
+    setUser(null)
+  }, [])
+
+  if (user === undefined) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}>
+        Đang tải…
+      </div>
+    )
+  }
+  if (user === null) {
+    return <AuthScreen onAuthed={setUser} />
+  }
+
+  return <AppShell user={user} logout={HAS_AUTH ? logout : null} />
+}
+
+function AppShell({ user, logout }) {
   const [page, setPage] = useState('today')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -23,7 +62,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar page={page} go={go} open={sidebarOpen} />
+      <Sidebar page={page} go={go} open={sidebarOpen} user={user} logout={logout} />
       <div
         className={`sidebar-backdrop${sidebarOpen ? ' show' : ''}`}
         onClick={() => setSidebarOpen(false)}
@@ -50,7 +89,7 @@ export default function App() {
   )
 }
 
-function Sidebar({ page, go, open }) {
+function Sidebar({ page, go, open, user, logout }) {
   return (
     <aside className={`sidebar${open ? ' open' : ''}`} style={{
       background: 'var(--bg2)', borderRight: '1px solid var(--border)',
@@ -86,6 +125,27 @@ function Sidebar({ page, go, open }) {
       <div style={{ padding: '0 14px', fontSize: 11, color: 'var(--text3)' }}>
         {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}
       </div>
+      {logout && (
+        <div style={{ padding: '10px 14px 0', marginTop: 8, borderTop: '1px solid var(--border)' }}>
+          {user?.email && (
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user.email}
+            </div>
+          )}
+          <button
+            onClick={logout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '7px 10px', borderRadius: 'var(--radius-sm)',
+              background: 'transparent', color: 'var(--text2)', fontSize: 13,
+              border: '1px solid var(--border)', cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 14, opacity: 0.7 }}>⎋</span>
+            Đăng xuất
+          </button>
+        </div>
+      )}
     </aside>
   )
 }
