@@ -18,15 +18,17 @@ const NAV = [
 ]
 
 // The desktop (Electron) build is single-user and has no auth layer.
-const HAS_AUTH = !!(window.api && window.api.auth)
+// NOTE: must be read at render time — window.api is assigned in main.jsx AFTER
+// this module is imported, so a module-level const would always be false.
+const hasAuth = () => !!(window.api && window.api.auth)
 
 export default function App() {
-  // auth: 'loading' until we know; null = signed out; object = signed-in user.
-  const [user, setUser] = useState(HAS_AUTH ? undefined : { desktop: true })
+  // auth: undefined = loading; null = signed out; object = signed-in user.
+  const [user, setUser] = useState(() => (hasAuth() ? undefined : { desktop: true }))
 
   // Restore the session on first load (cookie → /auth/me, with refresh fallback).
   useEffect(() => {
-    if (!HAS_AUTH) return
+    if (!hasAuth()) return
     let alive = true
     window.api.auth.me()
       .then(res => { if (alive) setUser(res.user) })
@@ -52,7 +54,7 @@ export default function App() {
     return <AuthScreen onAuthed={setUser} />
   }
 
-  return <AppShell user={user} logout={HAS_AUTH ? logout : null} />
+  return <AppShell user={user} logout={hasAuth() ? logout : null} />
 }
 
 function AppShell({ user, logout }) {
