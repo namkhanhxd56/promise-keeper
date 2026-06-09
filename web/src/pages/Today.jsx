@@ -350,7 +350,7 @@ function DailyReview({ date }) {
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginTop: 16, marginBottom: 8 }}>
         Hôm nay bạn cảm thấy thế nào?
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="mood-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {MOODS.map(m => {
           const active = mood === m.id
           return (
@@ -359,6 +359,7 @@ function DailyReview({ date }) {
               type="button"
               onClick={() => pickMood(m.id)}
               title={m.label}
+              className="mood-btn"
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                 padding: '8px 10px', borderRadius: 10, minWidth: 56,
@@ -368,7 +369,7 @@ function DailyReview({ date }) {
               }}
             >
               <span style={{ fontSize: 24, lineHeight: 1, filter: active ? 'none' : 'grayscale(0.4)', opacity: active ? 1 : 0.75 }}>{m.icon}</span>
-              <span style={{ fontSize: 10, color: active ? 'var(--accent)' : 'var(--text3)', fontWeight: active ? 600 : 400 }}>{m.label}</span>
+              <span className="mood-label" style={{ fontSize: 10, color: active ? 'var(--accent)' : 'var(--text3)', fontWeight: active ? 600 : 400 }}>{m.label}</span>
             </button>
           )
         })}

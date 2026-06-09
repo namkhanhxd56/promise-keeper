@@ -96,6 +96,11 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 
   /* Stack "Xu hướng 30 ngày" and "Tháng này" into separate rows on phones */
   .trend-month-grid { grid-template-columns: 1fr !important; }
+
+  /* Mood picker: keep all 5 on a single row and drop the text labels on phones */
+  .mood-row { flex-wrap: nowrap !important; gap: 6px !important; }
+  .mood-btn { min-width: 0 !important; flex: 1 1 0 !important; padding: 8px 4px !important; }
+  .mood-label { display: none !important; }
 }
 
 /* Ngày Chiến Thắng — victory tag */
