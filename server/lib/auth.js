@@ -38,9 +38,17 @@ function clearAuthCookies(res) {
   res.clearCookie('refresh_token', { ...cookieOpts(0), maxAge: undefined })
 }
 
-// Express middleware: require a valid access token, expose req.userId.
+// Read a Bearer access token from the Authorization header (mobile browsers
+// block cross-site cookies, so the header is the primary transport there).
+function bearerToken(req) {
+  const h = req.headers?.authorization || req.headers?.Authorization
+  if (typeof h === 'string' && h.startsWith('Bearer ')) return h.slice(7).trim()
+  return null
+}
+
+// Express middleware: require a valid access token (header OR cookie).
 function authRequired(req, res, next) {
-  const token = req.cookies?.access_token
+  const token = bearerToken(req) || req.cookies?.access_token
   if (!token) return res.status(401).json({ error: 'Chưa đăng nhập' })
   try {
     req.userId = verifyAccess(token).userId
@@ -52,5 +60,5 @@ function authRequired(req, res, next) {
 
 module.exports = {
   signAccess, signRefresh, verifyAccess, verifyRefresh,
-  setAuthCookies, clearAuthCookies, authRequired,
+  setAuthCookies, clearAuthCookies, authRequired, bearerToken,
 }

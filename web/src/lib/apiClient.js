@@ -4,13 +4,34 @@
 
 const BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
-// Auth lives in httpOnly cookies (never localStorage), so every request must
-// send credentials and the API must allow them via CORS.
+// Token transport. Cross-site cookies are blocked by mobile browsers (Safari
+// iOS, Chrome), so we ALSO carry the JWTs ourselves and send the access token
+// via the Authorization header. Cookies still work on desktop/same-site.
+const ACCESS_KEY = 'pk_access_token'
+const REFRESH_KEY = 'pk_refresh_token'
+const tokens = {
+  get access() { try { return localStorage.getItem(ACCESS_KEY) } catch { return null } },
+  get refresh() { try { return localStorage.getItem(REFRESH_KEY) } catch { return null } },
+  set(access, refresh) {
+    try {
+      if (access) localStorage.setItem(ACCESS_KEY, access)
+      if (refresh) localStorage.setItem(REFRESH_KEY, refresh)
+    } catch { /* ignore */ }
+  },
+  clear() {
+    try { localStorage.removeItem(ACCESS_KEY); localStorage.removeItem(REFRESH_KEY) } catch { /* ignore */ }
+  },
+}
+
 function rawFetch(method, path, body) {
+  const headers = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const at = tokens.access
+  if (at) headers['Authorization'] = `Bearer ${at}`
   return fetch(BASE + path, {
     method,
     credentials: 'include',
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
 }
@@ -22,7 +43,15 @@ const NO_REFRESH = ['/auth/refresh', '/auth/login', '/auth/register', '/auth/log
 let refreshing = null
 function tryRefresh() {
   if (!refreshing) {
-    refreshing = rawFetch('POST', '/auth/refresh').then(r => r.ok).catch(() => false)
+    const rt = tokens.refresh
+    refreshing = rawFetch('POST', '/auth/refresh', rt ? { refreshToken: rt } : {})
+      .then(async (r) => {
+        if (!r.ok) return false
+        const data = await r.json().catch(() => null)
+        if (data?.accessToken) tokens.set(data.accessToken, data.refreshToken)
+        return true
+      })
+      .catch(() => false)
     refreshing.finally(() => { refreshing = null })
   }
   return refreshing
@@ -48,6 +77,7 @@ async function http(method, path, body, _retried) {
     const ok = await tryRefresh()
     if (ok) return http(method, path, body, true)
     // Refresh failed → session is gone; let the app drop back to login.
+    tokens.clear()
     window.dispatchEvent(new CustomEvent('auth:logout'))
   }
   return parse(res)
@@ -64,11 +94,27 @@ const qs = (obj) => {
 export function createHttpApi() {
   return {
     auth: {
-      register: (email, password) => http('POST', '/auth/register', { email, password }),
-      login: (email, password) => http('POST', '/auth/login', { email, password }),
-      logout: () => http('POST', '/auth/logout', {}),
+      register: async (email, password) => {
+        const r = await http('POST', '/auth/register', { email, password })
+        if (r?.accessToken) tokens.set(r.accessToken, r.refreshToken)
+        return r
+      },
+      login: async (email, password) => {
+        const r = await http('POST', '/auth/login', { email, password })
+        if (r?.accessToken) tokens.set(r.accessToken, r.refreshToken)
+        return r
+      },
+      logout: async () => {
+        try { await http('POST', '/auth/logout', {}) } finally { tokens.clear() }
+        return { ok: true }
+      },
       me: () => http('GET', '/auth/me'),
-      refresh: () => http('POST', '/auth/refresh', {}),
+      refresh: async () => {
+        const rt = tokens.refresh
+        const r = await http('POST', '/auth/refresh', rt ? { refreshToken: rt } : {})
+        if (r?.accessToken) tokens.set(r.accessToken, r.refreshToken)
+        return r
+      },
     },
     people: {
       list: () => get('/people'),

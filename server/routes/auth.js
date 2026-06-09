@@ -2,9 +2,21 @@ const express = require('express')
 const bcrypt = require('bcryptjs')
 const { q, q1 } = require('../db')
 const { wrap } = require('../lib/http')
-const { setAuthCookies, clearAuthCookies, verifyRefresh, authRequired } = require('../lib/auth')
+const { setAuthCookies, clearAuthCookies, verifyRefresh, authRequired, signAccess, signRefresh } = require('../lib/auth')
 
 const router = express.Router()
+
+// Build the auth response: set cookies (desktop / same-site) AND return tokens
+// in the body so the web client can send them via Authorization header — this
+// is what makes login work on mobile browsers that block cross-site cookies.
+function authResponse(res, user) {
+  setAuthCookies(res, user.id)
+  res.json({
+    user: publicUser(user),
+    accessToken: signAccess(user.id),
+    refreshToken: signRefresh(user.id),
+  })
+}
 
 const BCRYPT_COST = 12
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -58,8 +70,7 @@ router.post('/register', wrap(async (req, res) => {
   // The first (oldest) account inherits any pre-auth (single-user) data.
   await claimLegacyForOldest(user.id)
 
-  setAuthCookies(res, user.id)
-  res.json({ user: publicUser(user) })
+  authResponse(res, user)
 }))
 
 // POST /auth/login  { email, password }
@@ -78,13 +89,13 @@ router.post('/login', wrap(async (req, res) => {
   // Recovery: if any legacy data is still orphaned, the first account reclaims it.
   await claimLegacyForOldest(user.id)
 
-  setAuthCookies(res, user.id)
-  res.json({ user: publicUser(user) })
+  authResponse(res, user)
 }))
 
 // POST /auth/refresh — mint a fresh access token from the refresh cookie
 router.post('/refresh', wrap(async (req, res) => {
-  const token = req.cookies?.refresh_token
+  // Accept the refresh token from the body (header-based clients) or cookie.
+  const token = req.body?.refreshToken || req.cookies?.refresh_token
   if (!token) return res.status(401).json({ error: 'Chưa đăng nhập' })
   let userId
   try { userId = verifyRefresh(token).userId }
@@ -93,8 +104,7 @@ router.post('/refresh', wrap(async (req, res) => {
   const user = await q1('SELECT * FROM users WHERE id = $1', [userId])
   if (!user) return res.status(401).json({ error: 'Tài khoản không tồn tại' })
 
-  setAuthCookies(res, user.id) // rotate both tokens
-  res.json({ user: publicUser(user) })
+  authResponse(res, user) // rotate both tokens (cookies + body)
 }))
 
 // POST /auth/logout
