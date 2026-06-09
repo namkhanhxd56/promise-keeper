@@ -93,6 +93,9 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   }
   /* Tighten page padding and clear the fixed toggle button at the top */
   main > div:last-child { padding-left: 16px; padding-right: 16px; padding-top: 44px; }
+
+  /* Stack "Xu hướng 30 ngày" and "Tháng này" into separate rows on phones */
+  .trend-month-grid { grid-template-columns: 1fr !important; }
 }
 
 /* Ngày Chiến Thắng — victory tag */
