@@ -17,12 +17,26 @@ const NAV = [
 
 export default function App() {
   const [page, setPage] = useState('today')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const go = (id) => { setPage(id); setSidebarOpen(false) }
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar page={page} setPage={setPage} />
+      <Sidebar page={page} go={go} open={sidebarOpen} />
+      <div
+        className={`sidebar-backdrop${sidebarOpen ? ' show' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div className="titlebar" />
+        <button
+          className="sidebar-toggle"
+          onClick={() => setSidebarOpen(o => !o)}
+          aria-label="Ẩn/hiện thanh điều hướng"
+        >
+          {sidebarOpen ? '✕' : '☰'}
+        </button>
         <div style={{ flex: 1, overflow: 'auto', padding: '0 28px 28px' }}>
           {page === 'today' && <Today />}
           {page === 'promises' && <Promises />}
@@ -36,12 +50,11 @@ export default function App() {
   )
 }
 
-function Sidebar({ page, setPage }) {
+function Sidebar({ page, go, open }) {
   return (
-    <aside style={{
-      width: 200, background: 'var(--bg2)', borderRight: '1px solid var(--border)',
+    <aside className={`sidebar${open ? ' open' : ''}`} style={{
+      background: 'var(--bg2)', borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column', padding: '0 0 16px',
-      flexShrink: 0
     }}>
       <div className="titlebar" style={{ borderBottom: '1px solid var(--border)' }} />
       <div style={{ padding: '16px 14px 8px' }}>
@@ -54,7 +67,7 @@ function Sidebar({ page, setPage }) {
         {NAV.map(n => (
           <button
             key={n.id}
-            onClick={() => setPage(n.id)}
+            onClick={() => go(n.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: 9, width: '100%',
               padding: '8px 10px', borderRadius: 'var(--radius-sm)', marginBottom: 2,

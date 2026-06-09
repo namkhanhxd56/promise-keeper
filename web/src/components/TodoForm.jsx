@@ -167,9 +167,9 @@ export default function TodoForm({ initial, defaultDate, onSave, onCancel }) {
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>Khối lượng</label>
-          <input type="text" inputMode="decimal" value={durText}
+          <input type="text" value={durText}
             onChange={e => onChangeDuration(e.target.value)}
-            placeholder="vd 90 hoặc 1.5" />
+            placeholder="vd 90 (phút) hoặc 1h30" />
         </div>
       </div>
       {(() => {
@@ -186,7 +186,7 @@ export default function TodoForm({ initial, defaultDate, onSave, onCancel }) {
             {rangeErr
               ? '⚠ Giờ kết thúc phải sau giờ bắt đầu'
               : `${summary}${summary && durLabel ? ' · ' : ''}${durLabel}${big ? '  ⚠ khối lượng lớn' : ''}`}
-            <span style={{ color: 'var(--text3)', marginLeft: 8 }}>· nhập 1 ô, 2 ô kia tự tính</span>
+            <span style={{ color: 'var(--text3)', marginLeft: 8 }}>· nhập 1 ô, 2 ô kia tự tính · khối lượng mặc định là phút, thêm “h” để tính giờ</span>
           </div>
         )
       })()}

@@ -70,15 +70,28 @@ export function diffMinutesRaw(start, end) {
   return (eh * 60 + em) - (sh * 60 + sm)
 }
 
-// Parse a duration the user typed: "90" → 90 phút, "1.5"/"1,5" → 90 phút.
+// Parse a duration the user typed. Default unit is MINUTES; add an "h" for hours.
+//   "90"     → 90 phút
+//   "1h"     → 60 phút      "2h" → 120
+//   "1.5h"   → 90 phút      "1,5h" → 90
+//   "1h30"   → 90 phút
 // null when blank/invalid.
 export function parseDuration(str) {
   if (str == null) return null
-  const s = String(str).trim().replace(',', '.')
+  const s = String(str).trim().toLowerCase().replace(',', '.')
   if (s === '') return null
+  if (s.includes('h')) {
+    const [hPart, mPart] = s.split('h')
+    const h = hPart === '' ? 0 : parseFloat(hPart)
+    const m = (mPart == null || mPart === '') ? 0 : parseFloat(mPart)
+    if (Number.isNaN(h) || Number.isNaN(m)) return null
+    const mins = Math.round(h * 60 + m)
+    return mins > 0 ? mins : null
+  }
   const n = parseFloat(s)
   if (Number.isNaN(n)) return null
-  return s.includes('.') ? Math.round(n * 60) : Math.round(n)
+  const mins = Math.round(n)
+  return mins > 0 ? mins : null
 }
 
 // A day is a "Ngày Chiến Thắng" (Victory Day) when ≥90% of its tasks are done.
