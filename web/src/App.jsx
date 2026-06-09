@@ -6,6 +6,7 @@ import Habits from './pages/Habits'
 import History from './pages/History'
 import Integrity from './pages/Integrity'
 import AuthScreen from './components/AuthScreen'
+import UserMenu from './components/UserMenu'
 
 const NAV = [
   { id: 'today', label: 'Hôm nay', icon: '◎' },
@@ -125,27 +126,7 @@ function Sidebar({ page, go, open, user, logout }) {
       <div style={{ padding: '0 14px', fontSize: 11, color: 'var(--text3)' }}>
         {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}
       </div>
-      {logout && (
-        <div style={{ padding: '10px 14px 0', marginTop: 8, borderTop: '1px solid var(--border)' }}>
-          {user?.email && (
-            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user.email}
-            </div>
-          )}
-          <button
-            onClick={logout}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '7px 10px', borderRadius: 'var(--radius-sm)',
-              background: 'transparent', color: 'var(--text2)', fontSize: 13,
-              border: '1px solid var(--border)', cursor: 'pointer',
-            }}
-          >
-            <span style={{ fontSize: 14, opacity: 0.7 }}>⎋</span>
-            Đăng xuất
-          </button>
-        </div>
-      )}
+      {logout && <UserMenu user={user} logout={logout} />}
     </aside>
   )
 }

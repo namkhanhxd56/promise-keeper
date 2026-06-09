@@ -15,7 +15,29 @@ const DUMMY_HASH = '$2b$12$CjGV3lnSZD6TvEIjzQI9uelEvcG/YL5QBLs9S.5O57vATbyxzsIJG
 // Tables whose legacy rows (user_id = '1') get handed to the first account.
 const CLAIMABLE = ['people', 'promises', 'todos', 'daily_reviews', 'streak_rescues']
 
-const publicUser = (u) => ({ id: u.id, email: u.email, encryption_version: u.encryption_version })
+const publicUser = (u) => ({
+  id: u.id,
+  email: u.email,
+  encryption_version: u.encryption_version,
+  created_at: u.created_at,
+})
+
+// Move any pre-auth (single-user) rows tagged with the sentinel '1' onto a user.
+async function claimLegacyData(userId) {
+  for (const tbl of CLAIMABLE) {
+    try { await q(`UPDATE ${tbl} SET user_id = $1 WHERE user_id = '1'`, [userId]) }
+    catch (e) { console.warn(`[auth] claim ${tbl} skipped:`, e.message) }
+  }
+}
+
+// Recovery safety net: the very first account (oldest by created_at) always
+// owns the legacy data. Re-running this is cheap (0 rows once claimed), so we
+// call it on every login — if data was ever orphaned, signing into the first
+// account re-attaches it.
+async function claimLegacyForOldest(userId) {
+  const oldest = await q1('SELECT id FROM users ORDER BY created_at ASC, email ASC LIMIT 1')
+  if (oldest && String(oldest.id) === String(userId)) await claimLegacyData(userId)
+}
 
 // POST /auth/register  { email, password }
 router.post('/register', wrap(async (req, res) => {
@@ -28,20 +50,13 @@ router.post('/register', wrap(async (req, res) => {
   if (existing) return res.status(409).json({ error: 'Email đã được đăng ký' })
 
   const hashed = await bcrypt.hash(password, BCRYPT_COST)
-  const isFirstUser = (await q1('SELECT COUNT(*)::int AS c FROM users')).c === 0
-
   const user = await q1(
     'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING *',
     [email, hashed]
   )
 
-  // The very first account inherits any pre-auth (single-user) data.
-  if (isFirstUser) {
-    for (const tbl of CLAIMABLE) {
-      try { await q(`UPDATE ${tbl} SET user_id = $1 WHERE user_id = '1'`, [user.id]) }
-      catch (e) { console.warn(`[auth] claim ${tbl} skipped:`, e.message) }
-    }
-  }
+  // The first (oldest) account inherits any pre-auth (single-user) data.
+  await claimLegacyForOldest(user.id)
 
   setAuthCookies(res, user.id)
   res.json({ user: publicUser(user) })
@@ -59,6 +74,9 @@ router.post('/login', wrap(async (req, res) => {
     ? await bcrypt.compare(password, user.password)
     : await bcrypt.compare(password, DUMMY_HASH)
   if (!user || !ok) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' })
+
+  // Recovery: if any legacy data is still orphaned, the first account reclaims it.
+  await claimLegacyForOldest(user.id)
 
   setAuthCookies(res, user.id)
   res.json({ user: publicUser(user) })
