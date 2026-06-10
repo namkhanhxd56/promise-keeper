@@ -250,7 +250,7 @@ function TodoItem({ todo, onToggle, onDelete, onEdit }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0
       }}>
-        {todo.done && <span style={{ color: 'white', fontSize: 11 }}>✓</span>}
+        {!!todo.done && <span style={{ color: 'white', fontSize: 11 }}>✓</span>}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, color: todo.done ? 'var(--text3)' : 'var(--text)', textDecoration: todo.done ? 'line-through' : 'none', lineHeight: 1.4 }}>

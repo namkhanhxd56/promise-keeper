@@ -85,7 +85,7 @@ export default function StepsPanel({ promise }) {
                   background: s.done ? 'var(--accent)' : 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
-                  {s.done && <span style={{ color: 'white', fontSize: 11 }}>✓</span>}
+                  {!!s.done && <span style={{ color: 'white', fontSize: 11 }}>✓</span>}
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, color: s.done ? 'var(--accent)' : 'var(--text)', textDecoration: s.done ? 'line-through' : 'none' }}>
